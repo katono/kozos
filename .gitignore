@@ -1,0 +1,6 @@
+*.o
+*.mot
+*.elf
+*.log
+kzload
+Session.vim
