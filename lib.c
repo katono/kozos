@@ -325,13 +325,17 @@ int isprint(int c)
 	return 0;
 }
 
-int printf(const char *format, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4)
+int printf(const char *format, ...)
 {
 	/* NOTE: attention to buffer overflow */
 	static char buf[256];
 	const char *p;
 	int ret;
-	ret = sprintf(buf, format, arg1, arg2, arg3, arg4);
+	va_list ap;
+
+	va_start(ap, format);
+	ret = vsprintf(buf, format, ap);
+	va_end(ap);
 
 	for (p = buf; *p; p++) {
 		putc(*p);
@@ -339,11 +343,43 @@ int printf(const char *format, unsigned long arg1, unsigned long arg2, unsigned 
 	return ret;
 }
 
-static size_t set_ascii(char *ascii, const char *tmp, size_t size, size_t width, int left_flag, int zero_flag)
+/* 
+ * flags:
+ *
+ * bit 0: left_flag
+ * bit 1: zero_flag
+ * bit 2: plus_flag
+ * bit 3: space_flag
+ * bit 4: signed_flag('u':0, 'd'or'i':1)
+ * bit 5: X_flag('x':0, 'X':1)
+ * bit 6: sharp_flag
+ *
+ * bit 8-15: width
+ */
+#define SET_LEFT_FLAG(flags)	((flags) |= 0x0001)
+#define SET_ZERO_FLAG(flags)	((flags) |= 0x0002)
+#define SET_PLUS_FLAG(flags)	((flags) |= 0x0004)
+#define SET_SPACE_FLAG(flags)	((flags) |= 0x0008)
+#define SET_SIGNED_FLAG(flags)	((flags) |= 0x0010)
+#define SET_LARGEX_FLAG(flags)	((flags) |= 0x0020)
+#define SET_SHARP_FLAG(flags)	((flags) |= 0x0040)
+#define SET_WIDTH(flags, width)	((flags) |= ((unsigned char)((width) & 0xff) << 8))
+
+#define IS_SET_LEFT_FLAG(flags)		((flags) & 0x0001)
+#define IS_SET_ZERO_FLAG(flags)		((flags) & 0x0002)
+#define IS_SET_PLUS_FLAG(flags)		((flags) & 0x0004)
+#define IS_SET_SPACE_FLAG(flags)	((flags) & 0x0008)
+#define IS_SET_SIGNED_FLAG(flags)	((flags) & 0x0010)
+#define IS_SET_LARGEX_FLAG(flags)	((flags) & 0x0020)
+#define IS_SET_SHARP_FLAG(flags)	((flags) & 0x0040)
+#define GET_WIDTH(flags)			((unsigned char)(((flags) & 0xff00) >> 8))
+
+static int set_ascii(char *ascii, const char *tmp, int size, unsigned long flags)
 {
-	size_t i;
+	int i;
+	int width = GET_WIDTH(flags);
 	if (width > 1) {
-		if (left_flag) {
+		if (IS_SET_LEFT_FLAG(flags)) {
 			for (i = 0; i < size; i++) {
 				ascii[i] = tmp[size - i - 1];
 			}
@@ -351,17 +387,32 @@ static size_t set_ascii(char *ascii, const char *tmp, size_t size, size_t width,
 				for (i = 0; i < width - size; i++) {
 					ascii[size + i] = ' ';
 				}
-				size += width - size;
+				size = width;
 			}
 		} else {
 			if (width > size) {
-				for (i = 0; i < width - size; i++) {
-					ascii[i] = zero_flag ? '0' : ' ';
+				if (IS_SET_ZERO_FLAG(flags) && 
+						(IS_SET_SHARP_FLAG(flags) || IS_SET_PLUS_FLAG(flags) || IS_SET_SPACE_FLAG(flags) || 
+						(IS_SET_SIGNED_FLAG(flags) && tmp[size - 1] == '-'))) {
+					int n = IS_SET_SHARP_FLAG(flags) ? 2 /* "0[xX]" */ : 1 /* "[ +-]" */;
+					for (i = 0; i < n; i++) {
+						ascii[i] = tmp[size - i - 1];
+					}
+					for (i = 0; i < width - size; i++) {
+						ascii[i + n] = '0';
+					}
+					for (i = 0; i < size - n; i++) {
+						ascii[width - size + i + n] = tmp[size - i - 1 - n];
+					}
+				} else {
+					for (i = 0; i < width - size; i++) {
+						ascii[i] = IS_SET_ZERO_FLAG(flags) ? '0' : ' ';
+					}
+					for (i = 0; i < size; i++) {
+						ascii[width - size + i] = tmp[size - i - 1];
+					}
 				}
-				for (i = 0; i < size; i++) {
-					ascii[width - size + i] = tmp[size - i - 1];
-				}
-				size += width - size;
+				size = width;
 			} else {
 				for (i = 0; i < size; i++) {
 					ascii[i] = tmp[size - i - 1];
@@ -376,68 +427,81 @@ static size_t set_ascii(char *ascii, const char *tmp, size_t size, size_t width,
 	return size;
 }
 
-static size_t dec2ascii(char *ascii, unsigned int dec, size_t width, int left_flag, int zero_flag, int signed_flag)
+#define TMP_SIZE	32
+static int dec2ascii(char *ascii, unsigned int dec, unsigned long flags)
 {
-	size_t i;
-	char tmp[16];
+	int i;
+	char tmp[TMP_SIZE];
 	const char *num_str = "0123456789";
 	int signed_dec = (int) dec;
 	if (dec == 0) {
 		tmp[0] = '0';
 		i = 1;
-	} else if (signed_flag && signed_dec < 0) {
+		if (IS_SET_PLUS_FLAG(flags) || IS_SET_SPACE_FLAG(flags)) {
+			tmp[i++] = IS_SET_PLUS_FLAG(flags) ? '+' : ' ';
+		}
+	} else if (IS_SET_SIGNED_FLAG(flags) && signed_dec < 0) {
 		signed_dec = -signed_dec;
-		for (i = 0; signed_dec > 0 && i < 15; i++) {
+		for (i = 0; signed_dec > 0 && i < TMP_SIZE - 1; i++) {
 			tmp[i] = num_str[signed_dec % 10];
 			signed_dec /= 10;
 		}
 		tmp[i++] = '-';
 	} else {
-		for (i = 0; dec > 0 && i < 16; i++) {
+		for (i = 0; dec > 0 && i < TMP_SIZE - 1; i++) {
 			tmp[i] = num_str[dec % 10];
 			dec /= 10;
 		}
+		if (IS_SET_PLUS_FLAG(flags) || IS_SET_SPACE_FLAG(flags)) {
+			tmp[i++] = IS_SET_PLUS_FLAG(flags) ? '+' : ' ';
+		}
 	}
-	return set_ascii(ascii, tmp, i, width, left_flag, zero_flag);
+	return set_ascii(ascii, tmp, i, flags);
 }
 
-static size_t hex2ascii(char *ascii, unsigned long hex, size_t width, int left_flag, int zero_flag, int case_char)
+static int hex2ascii(char *ascii, size_t hex, unsigned long flags)
 {
-	size_t i;
-	char tmp[16];
-	const char *num_str = (case_char == 'X') ? "0123456789ABCDEF" : "0123456789abcdef";
+	int i;
+	char tmp[TMP_SIZE];
+	const char *num_str = IS_SET_LARGEX_FLAG(flags) ? "0123456789ABCDEF" : "0123456789abcdef";
 	if (hex == 0) {
 		tmp[0] = '0';
 		i = 1;
 	} else {
-		for (i = 0; hex > 0 && i < 16; i++) {
+		for (i = 0; hex > 0 && i < TMP_SIZE; i++) {
 			tmp[i] = num_str[hex & 0xf];
 			hex >>= 4;
 		}
+		if (IS_SET_SHARP_FLAG(flags)) {
+			tmp[i++] = IS_SET_LARGEX_FLAG(flags) ? 'X' : 'x';
+			tmp[i++] = '0';
+		}
 	}
-	return set_ascii(ascii, tmp, i, width, left_flag, zero_flag);
+	return set_ascii(ascii, tmp, i, flags);
 }
 
-int sprintf(char *buf, const char *format, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4)
+int sprintf(char *buf, const char *format, ...)
 {
-	size_t i;
-	const char *p = format;
-	unsigned long arg_list[4];
-	size_t arg_idx = 0;
-	const char *tmp_str;
-	unsigned long tmp_val;
-	int left_flag;
-	int zero_flag;
-	size_t width;
-	size_t inc;
+	int ret;
+	va_list ap;
+	va_start(ap, format);
+	ret = vsprintf(buf, format, ap);
+	va_end(ap);
+	return ret;
+}
 
-	arg_list[0] = arg1;
-	arg_list[1] = arg2;
-	arg_list[2] = arg3;
-	arg_list[3] = arg4;
+int vsprintf(char *buf, const char *format, va_list ap)
+{
+	int i;
+	const char *p = format;
+	const char *tmp_str;
+	size_t tmp_val;
+	unsigned long flags = 0;
+	int inc;
 
 	i = 0;
 	while (*p != '\0') {
+		int long_flag = 0;
 		if (*p != '%') {
 			buf[i++] = *(p++);
 			continue;
@@ -447,55 +511,91 @@ int sprintf(char *buf, const char *format, unsigned long arg1, unsigned long arg
 			buf[i++] = *(p++);
 			continue;
 		}
-		if (*p == '-') {
-			left_flag = 1;
+		if (*p == ' ') {
+			SET_SPACE_FLAG(flags);
 			p++;
-		} else {
-			left_flag = 0;
+		}
+		if (*p == '+') {
+			SET_PLUS_FLAG(flags);
+			p++;
+		}
+		if (*p == '#') {
+			SET_SHARP_FLAG(flags);
+			p++;
+		}
+		if (*p == '-') {
+			SET_LEFT_FLAG(flags);
+			p++;
+		}
+		if (*p == ' ') {
+			SET_SPACE_FLAG(flags);
+			p++;
+		}
+		if (*p == '+') {
+			SET_PLUS_FLAG(flags);
+			p++;
 		}
 		if (*p == '0') {
-			zero_flag = 1;
+			SET_ZERO_FLAG(flags);
 			p++;
-		} else {
-			zero_flag = 0;
 		}
 		if ('1' <= *p && *p <= '9') {
-			width = *p - '0';
+			int width = *p - '0';
 			p++;
 			if ('0' <= *p && *p <= '9') {
 				width = 10 * width + (*p - '0');
 				p++;
 			}
-		} else {
-			width = 0;
+			SET_WIDTH(flags, width);
+		} else if (*p == '*') {
+			int width = (int) va_arg(ap, int);
+			if (width < 0) {
+				SET_LEFT_FLAG(flags);
+				width = -width;
+			}
+			SET_WIDTH(flags, width);
+			p++;
+		}
+		if (*p == 'h' || *p == 'l') {
+			if (*p == 'l') {
+				long_flag = 1;
+			}
+			p++;
 		}
 		switch (*p) {
 		case 'c':
-			buf[i++] = (char) arg_list[arg_idx++];
+			buf[i++] = va_arg(ap, char);
 			p++;
 			break;
 		case 'd':
 		case 'i':
 		case 'u':
-			tmp_val = (unsigned long) arg_list[arg_idx++];
-			inc = dec2ascii(&buf[i], (unsigned int) tmp_val, width, left_flag, zero_flag, (*p == 'u') ? 0 : 1);
+			tmp_val = va_arg(ap, int);
+			if (*p != 'u') {
+				SET_SIGNED_FLAG(flags);
+			}
+			inc = dec2ascii(&buf[i], (unsigned int) tmp_val, flags);
 			i += inc;
 			p++;
 			break;
 		case 'p':
 			buf[i++] = '0';
 			buf[i++] = 'x';
-			zero_flag = 1;
-			width = 8;
+			SET_ZERO_FLAG(flags);
+			SET_WIDTH(flags, 8);
+			long_flag = 1;
 		case 'x':
 		case 'X':
-			tmp_val = (unsigned long) arg_list[arg_idx++];
-			inc = hex2ascii(&buf[i], tmp_val, width, left_flag, zero_flag, *p);
+			tmp_val = long_flag ? va_arg(ap, size_t) : va_arg(ap, int);
+			if (*p == 'X') {
+				SET_LARGEX_FLAG(flags);
+			}
+			inc = hex2ascii(&buf[i], tmp_val, flags);
 			i += inc;
 			p++;
 			break;
 		case 's':
-			tmp_str = (const char *) arg_list[arg_idx++];
+			tmp_str = va_arg(ap, const char *);
 			while (*tmp_str != '\0') {
 				buf[i++] = *(tmp_str++);
 			}
@@ -505,10 +605,12 @@ int sprintf(char *buf, const char *format, unsigned long arg1, unsigned long arg
 			p++;
 			break;
 		}
+		flags = 0;
 	}
 	buf[i] = '\0';
 	return (int) i;
 }
+
 
 void hexdump(const void *buf, size_t size)
 {
@@ -519,27 +621,27 @@ void hexdump(const void *buf, size_t size)
 	p = (const unsigned char *) buf;
 	for (i = 0; i < size; i++) {
 		if (i%16 == 0) {
-			PRINTF1("%p: ", &p[i]);
+			printf("%p: ", &p[i]);
 		}
-		PRINTF1("%02x ", p[i]);
+		printf("%02x ", p[i]);
 		tmp[i%16] = p[i];
 		if (i == size -1) {
 			for (j = i+1; j < i + (16 - i%16); j++) {
 				tmp[j%16] = ' ';
-				PRINTF0("   ");
+				printf("   ");
 			}
 			i = j - 1;
 		}
 		if (i%16 == 15) {
-			PRINTF0(" ");
+			printf(" ");
 			for (j = 0; j < 16; j++) {
 				if (isprint(tmp[j])) {
-					PRINTF1("%c", tmp[j]);
+					printf("%c", tmp[j]);
 				} else {
-					PRINTF0(".");
+					printf(".");
 				}
 			}
-			PRINTF0("\n");
+			printf("\n");
 		}
 	}
 }

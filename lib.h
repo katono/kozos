@@ -1,6 +1,7 @@
 #ifndef LIB_H_INCLUDED
 #define LIB_H_INCLUDED
 
+#include <stdarg.h>
 #include "stddef.h"
 
 #ifdef UNITTEST
@@ -53,13 +54,9 @@ int isxdigit(int c);
 int isspace(int c);
 int isprint(int c);
 
-#define PRINTF0(f)					printf(f, 0, 0, 0, 0)
-#define PRINTF1(f, a1)				printf(f, (unsigned long)(a1), 0, 0, 0)
-#define PRINTF2(f, a1, a2)			printf(f, (unsigned long)(a1), (unsigned long)(a2), 0, 0)
-#define PRINTF3(f, a1, a2, a3)		printf(f, (unsigned long)(a1), (unsigned long)(a2), (unsigned long)(a3), 0)
-#define PRINTF4(f, a1, a2, a3, a4)	printf(f, (unsigned long)(a1), (unsigned long)(a2), (unsigned long)(a3), (unsigned long)(a4))
-int printf(const char *format, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4);
-int sprintf(char *buf, const char *format, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4);
+int printf(const char *format, ...);
+int sprintf(char *buf, const char *format, ...);
+int vsprintf(char *buf, const char *format, va_list ap);
 
 void hexdump(const void *buf, size_t size);
 
