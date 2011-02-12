@@ -1,5 +1,6 @@
 #include "defines.h"
 #include "serial.h"
+#include "xmodem.h"
 #include "lib.h"
 
 
@@ -27,8 +28,18 @@ static void printval(void)
 	printf("static_bss  = 0x%x\n", static_bss);
 }
 
+static void wait(void)
+{
+	volatile long i;
+	for (i = 0; i < 300000; i++) ;
+}
+
 int main(void)
 {
+	char buf[16];
+	long size = -1;
+	unsigned char *loadbuf = NULL;
+	extern int buffer_start;
 	long i = 0xFFFF;
 	init();
 
@@ -44,7 +55,26 @@ int main(void)
 	printval();
 	printf("%lx, %p, %#lx, %d\n", 0x1234L, main, i, 999);
 
-	while (1);
+	while (1) {
+		puts("kzload> ");
+		gets(buf, sizeof buf);
+
+		if (!strcmp(buf, "load")) {
+			loadbuf = (char *) &buffer_start;
+			size = xmodem_recv(loadbuf);
+			wait();
+			if (size < 0) {
+				puts("\nXMODEM receive error!\n");
+			} else {
+				puts("\nXMODEM receive succeeded.\n");
+			}
+		} else if (!strcmp(buf, "dump")) {
+			printf("size: %d(%#x) bytes\n", size, size);
+			hexdump(loadbuf, size);
+		} else {
+			puts("unknown.\n");
+		}
+	}
 
 	return 0;
 }
