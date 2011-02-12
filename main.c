@@ -14,19 +14,6 @@ static int init(void)
 	serial_init(SERIAL_DEFAULT_DEVICE);
 }
 
-int global_data = 0x10;
-int global_bss;
-static int static_data = 0x20;
-static int static_bss;
-
-
-static void printval(void)
-{
-	printf("global_data = 0x%x\n", global_data);
-	printf("global_bss  = 0x%x\n", global_bss);
-	printf("static_data = 0x%x\n", static_data);
-	printf("static_bss  = 0x%x\n", static_bss);
-}
 
 static void wait(void)
 {
@@ -40,20 +27,10 @@ int main(void)
 	long size = -1;
 	unsigned char *loadbuf = NULL;
 	extern int buffer_start;
-	long i = 0xFFFF;
+
 	init();
 
-	printf("Hello, World!\n");
-	printf("%d, 0x%x\n", 100, 100);
-
-	printval();
-	puts("overwrite variables.\n");
-	global_data = 0x20;
-	global_bss = 0x30;
-	static_data = 0x40;
-	static_bss = 0x50;
-	printval();
-	printf("%lx, %p, %#lx, %d\n", 0x1234L, main, i, 999);
+	printf("kzload (kozos boot loader) started.\n");
 
 	while (1) {
 		puts("kzload> ");
