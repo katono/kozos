@@ -30,6 +30,8 @@ int main(void)
 	long size = -1;
 	unsigned char *loadbuf = NULL;
 	extern int buffer_start;
+	char *entry_point;
+	void (*f)(void);
 
 	init();
 
@@ -52,7 +54,14 @@ int main(void)
 			printf("size: %d(%#x) bytes\n", size, size);
 			hexdump(loadbuf, size);
 		} else if (!strcmp(buf, "run")) {
-			elf_load(loadbuf);
+			entry_point = elf_load(loadbuf);
+			if (!entry_point) {
+				printf("run error!\n");
+			} else {
+				printf("starting from entry point: %#x\n", entry_point);
+				f = (void (*)(void)) entry_point;
+				f();
+			}
 		} else if (!strcmp(buf, "ramchk")) {
 			dram_check();
 		} else {

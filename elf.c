@@ -68,26 +68,22 @@ static int elf_load_program(struct elf_header *header)
 			continue;
 		}
 
-		printf("%6x  ", phdr->offset);
-		printf("%8x  ", phdr->virtual_addr);
-		printf("%8x  ", phdr->physical_addr);
-		printf("%5x  ", phdr->file_size);
-		printf("%5x  ", phdr->memory_size);
-		printf("%2x  ", phdr->flags);
-		printf("%2x  ", phdr->align);
-		printf("\n");
+		memcpy((char *)phdr->physical_addr, (char *)header + phdr->offset,
+				phdr->file_size);
+		memset((char *)phdr->physical_addr + phdr->file_size, 0, 
+				phdr->memory_size - phdr->file_size);
 	}
 	return 0;
 }
 
-int elf_load(char *buf)
+char *elf_load(char *buf)
 {
 	struct elf_header *header = (struct elf_header *) buf;
 
-	if (elf_check(header) < 0) return -1;
+	if (elf_check(header) < 0) return NULL;
 
-	if (elf_load_program(header) < 0) return -1;
+	if (elf_load_program(header) < 0) return NULL;
 
-	return 0;
+	return (char *)header->entry_point;
 }
 
