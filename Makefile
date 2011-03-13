@@ -21,6 +21,7 @@ OBJS = vector.o startup.o main.o
 OBJS += lib.o 
 OBJS += serial.o
 OBJS += xmodem.o
+OBJS += elf.o
 
 TARGET = kzload
 
