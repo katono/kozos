@@ -58,7 +58,7 @@ int main(void)
 			if (!entry_point) {
 				printf("run error!\n");
 			} else {
-				printf("starting from entry point: %#x\n", entry_point);
+				printf("starting from entry point: %p\n", entry_point);
 				f = (void (*)(void)) entry_point;
 				f();
 			}
