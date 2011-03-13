@@ -3,6 +3,7 @@
 #include "xmodem.h"
 #include "elf.h"
 #include "lib.h"
+#include "dram.h"
 
 
 static int init(void)
@@ -13,6 +14,7 @@ static int init(void)
 	memset(&bss_start, 0, (long) &ebss - (long) &bss_start);
 
 	serial_init(SERIAL_DEFAULT_DEVICE);
+	dram_init();
 }
 
 
@@ -51,6 +53,8 @@ int main(void)
 			hexdump(loadbuf, size);
 		} else if (!strcmp(buf, "run")) {
 			elf_load(loadbuf);
+		} else if (!strcmp(buf, "ramchk")) {
+			dram_check();
 		} else {
 			puts("unknown.\n");
 		}

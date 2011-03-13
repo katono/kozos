@@ -22,6 +22,7 @@ OBJS += lib.o
 OBJS += serial.o
 OBJS += xmodem.o
 OBJS += elf.o
+OBJS += dram.o
 
 TARGET = kzload
 
