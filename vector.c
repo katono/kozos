@@ -1,10 +1,9 @@
 #include "defines.h"
 
 void start(void);
-void int_sci_rxi0(void);
-void int_sci_rxi1(void);
-void int_sci_txi0(void);
-void int_sci_txi1(void);
+void intr_softerr(void);
+void intr_syscall(void);
+void intr_serintr(void);
 
 void (*vectors[])(void) = {
 	start,	/*  0 */
@@ -15,10 +14,10 @@ void (*vectors[])(void) = {
 	NULL, 	/*  5 */
 	NULL, 	/*  6 */
 	NULL, 	/*  7 */
-	NULL, 	/*  8 */
-	NULL, 	/*  9 */
-	NULL, 	/* 10 */
-	NULL, 	/* 11 */
+	intr_syscall, 	/*  8 */
+	intr_softerr, 	/*  9 */
+	intr_softerr, 	/* 10 */
+	intr_softerr, 	/* 11 */
 	NULL, 	/* 12 */
 	NULL, 	/* 13 */
 	NULL, 	/* 14 */
@@ -59,27 +58,16 @@ void (*vectors[])(void) = {
 	NULL, 	/* 49 */
 	NULL, 	/* 50 */
 	NULL, 	/* 51 */
-#if 0
-	NULL, 	/* 52: SCI0 ERI0 */
-	int_sci_rxi0, 	/* 53: SCI0 RXI0 */
-	int_sci_txi0, 	/* 54: SCI0 TXI0 */
-	NULL, 	/* 55: SCI0 TEI0 */
-	NULL, 	/* 56: SCI1 ERI1 */
-	int_sci_rxi1, 	/* 57: SCI1 RXI1 */
-	int_sci_txi1, 	/* 58: SCI1 TXI1 */
-	NULL, 	/* 59: SCI1 TEI1 */
-#else
-	NULL, 	/* 52: SCI0 ERI0 */
-	NULL, 	/* 53: SCI0 RXI0 */
-	NULL, 	/* 54: SCI0 TXI0 */
-	NULL, 	/* 55: SCI0 TEI0 */
-	NULL, 	/* 56: SCI1 ERI1 */
-	NULL, 	/* 57: SCI1 RXI1 */
-	NULL, 	/* 58: SCI1 TXI1 */
-	NULL, 	/* 59: SCI1 TEI1 */
-#endif
-	NULL, 	/* 60 */
-	NULL, 	/* 61 */
-	NULL, 	/* 62 */
-	NULL, 	/* 63 */
+	intr_serintr, 	/* 52: SCI0 ERI0 */
+	intr_serintr, 	/* 53: SCI0 RXI0 */
+	intr_serintr, 	/* 54: SCI0 TXI0 */
+	intr_serintr, 	/* 55: SCI0 TEI0 */
+	intr_serintr, 	/* 56: SCI1 ERI1 */
+	intr_serintr, 	/* 57: SCI1 RXI1 */
+	intr_serintr, 	/* 58: SCI1 TXI1 */
+	intr_serintr, 	/* 59: SCI1 TEI1 */
+	intr_serintr, 	/* 60 SCI2 ERI1 */
+	intr_serintr, 	/* 61 SCI2 RXI1 */
+	intr_serintr, 	/* 62 SCI2 TXI1 */
+	intr_serintr, 	/* 63 SCI2 TEI1 */
 };

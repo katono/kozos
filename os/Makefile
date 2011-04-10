@@ -19,6 +19,7 @@ OBJS = startup.o main.o
 OBJS += lib.o 
 OBJS += serial.o
 OBJS += dram.o
+OBJS += interrupt.o
 
 TARGET = kozos
 

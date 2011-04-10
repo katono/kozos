@@ -6,6 +6,7 @@ ENTRY("_start")
 MEMORY
 {
 	ram(rwx)		: o = 0x400000, l = 0x100000 /* 1MB */
+	softvec(rw)		: o = 0xffbf20, l = 0x000040 /* top of RAM */
 	stack(rw)		: o = 0xffff00, l = 0x000000 /* end of RAM */
 }
 
@@ -37,6 +38,10 @@ SECTIONS
 		*(COMMON)
 		_ebss = . ;
 	} > ram
+
+	.softvec : {
+		_softvec = . ;
+	} > softvec
 
 	. = ALIGN(4);
 	_end = . ;
