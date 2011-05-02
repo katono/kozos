@@ -174,3 +174,97 @@ static int thread_exit(void)
 	return 0;
 }
 
+/* 割り込みハンドらの登録 */
+static int setintr(softvec_type_t type, kz_handler_t handler)
+{
+	static void thread_intr(softvec_type_t type, unsigned long sp);
+
+	/* 
+	 * 割り込みを受け付けるために、ソフトウェア割り込みベクタに
+	 * OSの割り込み処理の入口となる関数を登録する。
+	 */
+	softvec_setintr(type, thread_intr);
+
+	handlers[type] = handler; /* OS側から呼び出す割り込みハンドラを登録 */
+
+	return 0;
+}
+
+static void call_functions(kz_syscall_type_t type, kz_syscall_param_t *p)
+{
+	/* システムコールの実行中にcurrentが書き換わるので注意 */
+	switch (type) {
+	case KZ_SYSCALL_TYPE_RUN: /* kz_run() */
+		p->un.run.ret = thread_run(p->un.run.func,
+								   p->un.run.name,
+								   p->un.run.stacksize,
+								   p->un.run.argc,
+								   p->un.run.argv);
+		break;
+	case KZ_SYSCALL_TYPE_EXIT: /* kz_exit() */
+		/* TCBが消去されるので、戻り値を書き込んではいけない */
+		thread_exit();
+		break;
+	default:
+		break;
+	}
+}
+
+/* システムコールの処理 */
+static void syscall_proc(kz_syscall_type_t type, kz_syscall_param_t *p)
+{
+	/* 
+	 * システムコールを呼び出したスレッドをレディーキューから
+	 * 外した状態で処理関数を呼び出す。このためシステムコールを
+	 * 呼び出したスレッドをそのまま動作継続させたい場合には、
+	 * 処理関数の内部でputcurrent()を行う必要がある。
+	 */
+	getcurrent();
+	call_functions(type, p);
+}
+
+/* スレッドのスケジューリング */
+static void schedule(void)
+{
+	if (!readyque.head) {
+		kz_sysdown();
+	}
+	current = readyque.head;
+}
+
+static void syscall_intr(void)
+{
+	syscall_proc(current->syscall.type, current->syscall.param);
+}
+
+static void softerr_intr(void)
+{
+	puts(current->name);
+	puts("  DOWN.\n");
+	getcurrent(); /* レディーキューから外す */
+	thread_exit(); /* スレッド終了する */
+}
+
+/* 割り込み処理の入口関数 */
+static void thread_intr(softvec_type_t type, unsigned long sp)
+{
+	/* カレントスレッドのコンテキストを保存する */
+	current->context.sp = sp;
+
+	/* 
+	 * 割り込みごとの処理を実行する。
+	 * SOFTVEC_TYPE_SYSCALL, SOFTVEC_TYPE_SOFTERRの場合は
+	 * syscall_intr(), softerr_intr()がハンドラに登録されているので、
+	 * それらが実行される。
+	 */
+	if (handlers[type]) {
+		handlers[type]();
+	}
+
+	schedule(); /* スレッドのスケジューリング */
+
+	/* スレッドのディスパッチ
+	 * dispatch()はstartup.sにある。 */
+	dispatch(&current->context);
+	/* ここには返ってこない */
+}
