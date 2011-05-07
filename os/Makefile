@@ -21,10 +21,14 @@ OBJS += serial.o
 OBJS += dram.o
 OBJS += interrupt.o
 
+#sources of kozos
+OBJS += kozos.o syscall.o
+OBJS += test08_1.o
+
 TARGET = kozos
 
 CFLAGS = -Wall -mh -nostdinc -nostdlib -fno-builtin
-CFLAGS += -I. -I.. -I../include
+CFLAGS += -I. -I../include
 CFLAGS += -Os
 CFLAGS += -DKOZOS
 

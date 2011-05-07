@@ -1,5 +1,5 @@
 #include "defines.h"
-#include "intr.h"
+#include "../intr.h"
 #include "interrupt.h"
 
 int softvec_init(void)

@@ -1,6 +1,6 @@
 #include "defines.h"
 #include "kozos.h"
-#include "intr.h"
+#include "../intr.h"
 #include "interrupt.h"
 #include "syscall.h"
 #include "lib.h"
