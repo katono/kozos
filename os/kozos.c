@@ -268,3 +268,43 @@ static void thread_intr(softvec_type_t type, unsigned long sp)
 	dispatch(&current->context);
 	/* ここには返ってこない */
 }
+
+void kz_start(kz_func_t func, char *name, int stacksize, int argc, char *argv[])
+{
+	/* 
+	 * 以降で呼び出すスレッド関連のライブラリ関数の内部でcurrentを
+	 * 見ている場合があるので、currentをNULLに初期化しておく。
+	 */
+	current = NULL;
+
+	readyque.head = readyque.tail = NULL;
+	memset(threads, 0, sizeof threads);
+	memset(handlers, 0, sizeof handlers);
+
+	/* 割り込みハンドラの登録 */
+	setintr(SOFTVEC_TYPE_SYSCALL, syscall_intr); /* システムコール */
+	setintr(SOFTVEC_TYPE_SOFTERR, softerr_intr); /* ダウン要因発生 */
+
+	/* システムコール発行不可なので直接関数を呼び出してスレッドを作成する */
+	current = (kz_thread *) thread_run(func, name, stacksize, argc, argv);
+
+	/* 最初のスレッドを起動 */
+	dispatch(&current->context);
+
+	/* ここには返ってこない */
+}
+
+void kz_sysdown(void)
+{
+	puts("system error!\n");
+	while (1);
+}
+
+/* システムコール呼び出しようライブラリ関数 */
+void kz_syscall(kz_syscall_type_t type, kz_syscall_param_t *param)
+{
+	current->syscall.type = type;
+	current->syscall.param = param;
+	asm volatile ("trapa #0"); /* トラップ割り込み発行 */
+}
+
