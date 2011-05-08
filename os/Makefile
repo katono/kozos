@@ -23,7 +23,9 @@ OBJS += interrupt.o
 
 #sources of kozos
 OBJS += kozos.o syscall.o
-OBJS += test08_1.o
+OBJS += test09_1.o
+OBJS += test09_2.o
+OBJS += test09_3.o
 
 TARGET = kozos
 
