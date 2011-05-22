@@ -1,6 +1,6 @@
 #include "defines.h"
 #include "kozos.h"
-#include "syscall.h"
+#include "lib.h"
 
 int test10_1_main(int argc, char *argv[])
 {
